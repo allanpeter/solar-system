@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solar System Simulator</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+      color: #ddd;
+    }
+
+    #canvas-container { width: 100vw; height: 100vh; }
+
+    /* ── Planet labels ──────────────────────────────────────── */
+    .planet-label {
+      position: fixed;
+      pointer-events: none;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      color: #cce;
+      text-shadow: 0 0 6px #000, 0 0 12px #000;
+      transform: translate(-50%, -160%);
+      white-space: nowrap;
+      letter-spacing: 1px;
+      user-select: none;
+    }
+
+    /* ── Left control panel ─────────────────────────────────── */
+    #ui-panel {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      width: 272px;
+      background: rgba(4, 8, 20, 0.88);
+      border: 1px solid rgba(80, 120, 200, 0.3);
+      border-radius: 10px;
+      padding: 14px 14px 10px;
+      z-index: 200;
+      backdrop-filter: blur(6px);
+    }
+
+    #ui-panel h2 {
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: #ffcc44;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .section {
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+    .section-title {
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #6688aa;
+      margin-bottom: 8px;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      color: #99aabb;
+      margin-bottom: 3px;
+    }
+
+    input[type="date"],
+    input[type="range"],
+    select {
+      width: 100%;
+      background: rgba(10, 20, 40, 0.8);
+      border: 1px solid rgba(80, 120, 200, 0.35);
+      color: #cce;
+      padding: 5px 7px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-family: inherit;
+      margin-bottom: 7px;
+      cursor: pointer;
+      outline: none;
+    }
+    input[type="date"] { color-scheme: dark; }
+    input[type="range"] { padding: 4px 0; accent-color: #4488ff; }
+    select:focus, input:focus { border-color: rgba(80,160,255,0.6); }
+
+    button {
+      width: 100%;
+      background: rgba(40, 80, 160, 0.3);
+      border: 1px solid rgba(80, 140, 255, 0.4);
+      color: #aaccff;
+      padding: 6px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-family: inherit;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      margin-bottom: 6px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button:hover:not(:disabled) {
+      background: rgba(60, 110, 220, 0.5);
+      border-color: rgba(120, 180, 255, 0.7);
+    }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    #btn-cancel-rocket {
+      background: rgba(160, 30, 30, 0.3);
+      border-color: rgba(255, 80, 80, 0.4);
+      color: #ff9999;
+      display: none;
+    }
+    #btn-cancel-rocket:hover {
+      background: rgba(200, 40, 40, 0.5);
+    }
+
+    /* Speed buttons row */
+    .speed-row {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 7px;
+    }
+    .speed-row button {
+      flex: 1;
+      margin-bottom: 0;
+      padding: 5px 2px;
+      font-size: 10px;
+    }
+    .speed-row button.active {
+      background: rgba(255, 200, 40, 0.35);
+      border-color: rgba(255, 200, 40, 0.7);
+      color: #ffcc44;
+    }
+
+    #time-display {
+      font-size: 15px;
+      color: #88ccff;
+      letter-spacing: 2px;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    #duration-display {
+      font-size: 11px;
+      color: #7799bb;
+      text-align: right;
+      margin-top: -5px;
+      margin-bottom: 7px;
+    }
+
+    #trajectory-info {
+      font-size: 11px;
+      color: #44ffcc;
+      min-height: 22px;
+      margin-top: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .toggle-row label {
+      margin-bottom: 0;
+      font-size: 11px;
+    }
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: #4488ff;
+    }
+
+    /* ── Selected body panel ──────────────────────────────── */
+    #selected-body {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      width: 210px;
+      background: rgba(4, 8, 20, 0.88);
+      border: 1px solid rgba(255, 200, 50, 0.3);
+      border-radius: 10px;
+      padding: 14px;
+      z-index: 200;
+      display: none;
+      backdrop-filter: blur(6px);
+    }
+    #selected-body h3 {
+      font-size: 15px;
+      color: #ffcc44;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+    #selected-info {
+      font-size: 11px;
+      color: #99aabb;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      margin-bottom: 10px;
+    }
+    #btn-focus {
+      margin-bottom: 0;
+    }
+
+    /* ── Hints ────────────────────────────────────────────── */
+    #hints {
+      position: fixed;
+      bottom: 12px;
+      right: 12px;
+      font-size: 11px;
+      color: #556677;
+      z-index: 200;
+      text-align: right;
+      line-height: 1.8;
+    }
+    #hints kbd {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 3px;
+      padding: 1px 5px;
+      color: #aabbcc;
+    }
+  </style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<!-- ── Left UI panel ──────────────────────────────────────────── -->
+<div id="ui-panel">
+  <h2>☀ Solar System</h2>
+
+  <!-- Date & time -->
+  <div class="section">
+    <div class="section-title">Date &amp; Time</div>
+    <div id="time-display">2024-01-01</div>
+
+    <label>Date</label>
+    <input type="date" id="date-input" value="2024-01-01">
+
+    <label>Speed</label>
+    <div class="speed-row">
+      <button class="speed-btn active" data-speed="0">⏸</button>
+      <button class="speed-btn"        data-speed="1">1d/s</button>
+      <button class="speed-btn"        data-speed="10">10d/s</button>
+      <button class="speed-btn"        data-speed="100">100d</button>
+      <button class="speed-btn"        data-speed="365">1yr/s</button>
+    </div>
+
+    <label>Scrub time (drag)</label>
+    <input type="range" id="timeline-scrubber" min="-500" max="500" value="0" step="1">
+  </div>
+
+  <!-- View toggles -->
+  <div class="section">
+    <div class="section-title">View</div>
+    <div class="toggle-row">
+      <label>Orbit paths</label>
+      <input type="checkbox" id="toggle-orbits" checked>
+    </div>
+    <div class="toggle-row">
+      <label>Planet labels</label>
+      <input type="checkbox" id="toggle-labels" checked>
+    </div>
+    <button id="btn-reset-camera">Reset Camera</button>
+  </div>
+
+  <!-- Rocket -->
+  <div class="section">
+    <div class="section-title">Rocket Launch</div>
+
+    <label>From</label>
+    <select id="origin-planet">
+      <option>Mercury</option>
+      <option>Venus</option>
+      <option selected>Earth</option>
+      <option>Mars</option>
+      <option>Jupiter</option>
+      <option>Saturn</option>
+    </select>
+
+    <label>To</label>
+    <select id="dest-planet">
+      <option>Mercury</option>
+      <option>Venus</option>
+      <option>Earth</option>
+      <option selected>Mars</option>
+      <option>Jupiter</option>
+      <option>Saturn</option>
+    </select>
+
+    <label>Travel duration</label>
+    <input type="range" id="travel-duration" min="30" max="1000" value="200" step="10">
+    <div id="duration-display">200 days</div>
+
+    <button id="btn-launch">⚡ Launch Rocket</button>
+    <button id="btn-cancel-rocket">✕ Cancel Rocket</button>
+
+    <div class="toggle-row">
+      <label>Follow rocket</label>
+      <input type="checkbox" id="toggle-follow-rocket">
+    </div>
+
+    <div id="trajectory-info"></div>
+  </div>
+</div>
+
+<!-- ── Selected body panel ──────────────────────────────────────── -->
+<div id="selected-body">
+  <h3 id="selected-name">-</h3>
+  <p id="selected-info">-</p>
+  <button id="btn-focus">Focus Camera</button>
+</div>
+
+<!-- ── Keyboard hints ───────────────────────────────────────────── -->
+<div id="hints">
+  <kbd>Click</kbd> to select &nbsp;
+  <kbd>Scroll</kbd> zoom &nbsp;
+  <kbd>Drag</kbd> orbit
+</div>
+
+<!-- Three.js via ES module import map -->
+<script type="importmap">
+{
+  "imports": {
+    "three":          "https://unpkg.com/three@0.152.2/build/three.module.js",
+    "three/addons/":  "https://unpkg.com/three@0.152.2/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="js/main.js"></script>
+
+</body>
+</html>
